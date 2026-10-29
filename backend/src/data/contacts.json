@@ -1,0 +1,37 @@
+[
+  {
+    "_id": "contact_real_001",
+    "name": "Irfan Altaf Mulla",
+    "phone": "+919371348035",
+    "relationship": "Friend",
+    "isPrimary": true
+  },
+  {
+    "_id": "contact_real_002",
+    "name": "Jameer Inamdar",
+    "phone": "+917249187996",
+    "relationship": "Friend",
+    "isPrimary": false
+  },
+  {
+    "_id": "contact_real_003",
+    "name": "Mahek Naikwadi",
+    "phone": "+919764207088",
+    "relationship": "Friend",
+    "isPrimary": false
+  },
+  {
+    "_id": "contact_real_004",
+    "name": "Saiprasad Jagannath Naikwad",
+    "phone": "+918446014758",
+    "relationship": "Friend",
+    "isPrimary": false
+  },
+  {
+    "_id": "contact_real_005",
+    "name": "Abujar Nadaf",
+    "phone": "+919881812186",
+    "relationship": "Friend",
+    "isPrimary": false
+  }
+]

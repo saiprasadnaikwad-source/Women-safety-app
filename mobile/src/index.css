@@ -1,0 +1,257 @@
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Outfit', sans-serif;
+
+  --bg-app: #f8fafc;
+  --bg-card: #ffffff;
+
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+
+  --color-blue: #2563eb;
+  --color-blue-dark: #1d4ed8;
+  --color-blue-light: #eff6ff;
+
+  --color-green: #16a34a;
+  --color-green-light: #f0fdf4;
+
+  --color-orange: #ea580c;
+  --color-orange-light: #fff7ed;
+
+  --color-red: #dc2626;
+  --color-red-dark: #b91c1c;
+  --color-red-light: #fef2f2;
+
+  --border-color: #e2e8f0;
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-elevated: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #0f172a; /* Outer dark environment for simulator frame */
+  color: var(--text-primary);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+/* Mobile Smartphone Frame Container */
+.mobile-wrapper {
+  width: 100%;
+  max-width: 440px;
+  height: 100vh;
+  max-height: 880px;
+  background-color: var(--bg-app);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media (min-width: 480px) {
+  .mobile-wrapper {
+    border-radius: 40px;
+    border: 8px solid #1e293b;
+    height: 860px;
+  }
+}
+
+/* Top App Header */
+.app-header {
+  padding: 1.25rem 1.25rem 0.75rem;
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+}
+
+.header-user h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.header-user p {
+  font-size: 0.8rem;
+  color: var(--color-green);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Main Content Screen Body */
+.screen-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-bottom: 6rem;
+}
+
+/* Mobile Bottom Navigation Bar */
+.bottom-nav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 68px;
+  background-color: var(--bg-card);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 50;
+  padding-bottom: 0.25rem;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  min-width: 56px;
+  min-height: 48px;
+  transition: color 0.2s ease;
+}
+
+.nav-item.active {
+  color: var(--color-blue);
+}
+
+/* Common UI Cards & Buttons */
+.card {
+  background-color: var(--bg-card);
+  border-radius: 16px;
+  padding: 1.25rem;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.btn-large {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-large:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background-color: var(--color-blue);
+  color: #ffffff;
+}
+
+.btn-danger {
+  background-color: var(--color-red);
+  color: #ffffff;
+}
+
+.btn-secondary {
+  background-color: #f1f5f9;
+  color: var(--text-primary);
+}
+
+/* Discreet Floating SOS Button */
+.discreet-sos-btn {
+  position: absolute;
+  bottom: 84px;
+  right: 18px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: var(--color-red);
+  color: white;
+  border: 4px solid white;
+  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.75rem;
+  cursor: pointer;
+  z-index: 40;
+  animation: subtlePulse 2s infinite;
+}
+
+@keyframes subtlePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Status Badges */
+.badge-pill {
+  padding: 0.3rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.badge-green { background-color: var(--color-green-light); color: var(--color-green); }
+.badge-orange { background-color: var(--color-orange-light); color: var(--color-orange); }
+.badge-red { background-color: var(--color-red-light); color: var(--color-red); }
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.modal-card {
+  background-color: var(--bg-card);
+  width: 100%;
+  border-radius: 24px;
+  padding: 1.75rem;
+  text-align: center;
+  box-shadow: var(--shadow-elevated);
+}
