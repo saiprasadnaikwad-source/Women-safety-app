@@ -15,6 +15,7 @@ interface EmergencyOverlayProps {
   onChangeCategory?: (category: string) => void;
   onNavigate?: () => void;
   tripDestination?: { name: string; lat: number; lng: number };
+  vehiclePlate?: string;
   onShareLocation?: () => void;
 }
 
@@ -24,6 +25,7 @@ export const EmergencyOverlay: React.FC<EmergencyOverlayProps> = ({
   onChangeCategory,
   onNavigate,
   tripDestination,
+  vehiclePlate,
   onShareLocation
 }) => {
   const [showShareModal, setShowShareModal] = useState(false);
@@ -47,12 +49,14 @@ export const EmergencyOverlay: React.FC<EmergencyOverlayProps> = ({
     const directionsLink = tripDestination
       ? `https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination=${tripDestination.lat},${tripDestination.lng}`
       : null;
+    const vehiclePlateText = vehiclePlate ? `\n🚗 Vehicle Number Plate: ${vehiclePlate}` : '';
 
     let contacts: EmergencyContact[] = [];
     let message =
       `🚨 EMERGENCY ALERT\n` +
       `${session.userName || 'User'} needs help!\n` +
       `📍 Live Location: ${googleMapLink}\n` +
+      vehiclePlateText +
       (tripDestination ? `🏁 Destination: ${tripDestination.name}\n` : '') +
       (directionsLink ? `🗺️ Route: ${directionsLink}\n` : '') +
       `Emergency ID: ${session.emergencyId}\nPlease respond immediately or call 112.`;
@@ -67,6 +71,7 @@ export const EmergencyOverlay: React.FC<EmergencyOverlayProps> = ({
       contacts = res.data.smsContacts || [];
       message = res.data.smsMessage
         ? res.data.smsMessage +
+          vehiclePlateText +
           (tripDestination ? `\n🏁 Destination: ${tripDestination.name}` : '') +
           (directionsLink ? `\n🗺️ Route: ${directionsLink}` : '')
         : message;
@@ -103,41 +108,23 @@ export const EmergencyOverlay: React.FC<EmergencyOverlayProps> = ({
     if (onShareLocation) onShareLocation();
   };
 
-  const handleCallPolice = async () => {
-    setCallContact(null);
+  const handleCallPolice = () => {
     setCallContactError('');
     setShowCallConfirmModal(true);
-    setLoadingCallContact(true);
+    setLoadingCallContact(false);
 
-    try {
-      const res = await axios.get(`${getApiBaseUrl()}/api/contacts`);
-      const contacts: EmergencyContact[] = res.data || [];
-      const jameer = contacts.find(contact => contact.name.trim().toLowerCase() === 'jameer inamdar');
+    const policePhone = isPolice && safeLoc.phone ? safeLoc.phone.split('/')[0].trim() : '112';
+    const policeName = isPolice && safeLoc.name ? safeLoc.name : 'Police Emergency Helpline';
 
-      if (!jameer?.phone) {
-        setCallContactError("Jameer's phone number was not found in your trusted contacts.");
-        return;
-      }
-
-      const phone = jameer.phone.replace(/[^\d+]/g, '');
-      if (!/^\+?\d{7,15}$/.test(phone)) {
-        setCallContactError("Jameer's saved phone number is invalid.");
-        return;
-      }
-
-      setCallContact({ name: jameer.name, phone });
-    } catch (error) {
-      console.error('[CALL CONTACT] Failed to load trusted contacts.', error);
-      setCallContactError("Couldn't load Jameer's number. Check that the backend is running and try again.");
-    } finally {
-      setLoadingCallContact(false);
-    }
+    setCallContact({ name: policeName, phone: policePhone });
   };
 
   const executeCall = () => {
     setShowCallConfirmModal(false);
-    if (callContact) window.location.href = `tel:${callContact.phone}`;
+    const phoneToCall = callContact?.phone || '112';
+    window.location.href = `tel:${phoneToCall}`;
   };
+
 
   const handleOpenExternalNavigation = () => {
     const origin = `${session.currentLocation.latitude},${session.currentLocation.longitude}`;
@@ -360,7 +347,7 @@ export const EmergencyOverlay: React.FC<EmergencyOverlayProps> = ({
               gridColumn: 'span 2'
             }}
           >
-            <Phone size={16} /> Call Jameer (Demo)
+            <Phone size={16} /> Call Police (112)
           </button>
         </div>
       </div>
@@ -408,16 +395,13 @@ export const EmergencyOverlay: React.FC<EmergencyOverlayProps> = ({
             <div style={{ width: 56, height: 56, borderRadius: '50%', backgroundColor: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}>
               <Phone size={28} />
             </div>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.35rem' }}>Call trusted contact?</h3>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.35rem' }}>Call Police Dispatch?</h3>
             <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.25rem' }}>
-              This demo opens your phone dialer for Jameer, not police dispatch. Confirm the call in your dialer.
+              This will open your phone dialer to connect directly to Police Emergency Services (112).
             </p>
-            {loadingCallContact && (
-              <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.25rem' }}>Loading Jameer's saved contact...</p>
-            )}
             {callContact && (
               <p style={{ fontSize: '0.9rem', color: '#0f172a', marginBottom: '1.25rem' }}>
-                Call <strong>{callContact.name}</strong> at <strong>{callContact.phone}</strong>?
+                Calling <strong>{callContact.name}</strong> ({callContact.phone})
               </p>
             )}
             {callContactError && (
@@ -427,8 +411,8 @@ export const EmergencyOverlay: React.FC<EmergencyOverlayProps> = ({
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              <button className="btn-large btn-danger" onClick={executeCall} disabled={loadingCallContact || !callContact}>
-                📞 Call Jameer
+              <button className="btn-large btn-danger" onClick={executeCall}>
+                📞 Call Police (112)
               </button>
               <button className="btn-large btn-secondary" onClick={() => setShowCallConfirmModal(false)}>
                 Cancel

@@ -8,11 +8,28 @@ import { sendJourneyStartedSMS, sendJourneyEndedSMS } from '../services/notifica
 
 export async function createTrip(req: AuthRequest, res: Response) {
   try {
-    const userId = req.user?.userId || 'user_demo_101';
-    const { source, destination, transportType, expectedRoute, expectedDuration } = req.body;
+    const { source, destination, transportType, expectedRoute, expectedDuration, userId: bodyUserId, userName, userPhone } = req.body;
+    const userId = bodyUserId || req.user?.userId || 'user_demo_101';
 
     if (!source || !destination) {
       return res.status(400).json({ message: 'Source and destination are required' });
+    }
+
+    let user = dbStore.users.get(userId);
+    if (!user && userName) {
+      user = {
+        _id: userId,
+        name: userName,
+        email: `${userId}@example.com`,
+        phone: userPhone || '',
+        passwordHash: '',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      dbStore.users.set(userId, user);
+    } else if (user && userName) {
+      user.name = userName;
+      if (userPhone) user.phone = userPhone;
     }
 
     const tripId = `trip_${Date.now()}`;
@@ -23,9 +40,14 @@ export async function createTrip(req: AuthRequest, res: Response) {
     ];
 
     const durationMins = expectedDuration || 30;
+    const resolvedUserName = userName || user?.name || 'Passenger';
+    const resolvedUserPhone = userPhone || user?.phone || '';
+
     const newTrip: ITrip = {
       _id: tripId,
       userId,
+      userName: resolvedUserName,
+      userPhone: resolvedUserPhone,
       source: typeof source === 'string' ? { name: source, lat: 18.5284, lng: 73.8739 } : source,
       destination: typeof destination === 'string' ? { name: destination, lat: 18.5912, lng: 73.7389 } : destination,
       transportType: transportType || 'Bus',
@@ -47,7 +69,6 @@ export async function createTrip(req: AuthRequest, res: Response) {
     }
 
     // Send journey start SMS to all trusted contacts
-    const user = dbStore.users.get(userId);
     if (user) {
       sendJourneyStartedSMS(
         userId,

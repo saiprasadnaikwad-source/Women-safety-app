@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Shield, Mail, Lock, User, Phone, UserPlus } from 'lucide-react';
+import axios from 'axios';
 import { registerUser } from '../services/userStore';
+import { getApiBaseUrl } from '../services/apiConfig';
 
 interface RegisterProps {
   onRegisterSuccess: (user: any, token: string) => void;
@@ -14,7 +16,7 @@ export const RegisterScreen: React.FC<RegisterProps> = ({ onRegisterSuccess, onS
 
   const handleChange = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -32,15 +34,38 @@ export const RegisterScreen: React.FC<RegisterProps> = ({ onRegisterSuccess, onS
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const result = registerUser(form.name.trim(), form.email.trim(), form.phone.trim(), form.password);
-      if (result.success && result.user) {
-        onRegisterSuccess(result.user, 'local-token');
+    const cleanName = form.name.trim();
+    const cleanEmail = form.email.trim();
+    const cleanPhone = form.phone.trim();
+    const cleanPassword = form.password;
+
+    try {
+      const baseUrl = getApiBaseUrl();
+      const res = await axios.post(`${baseUrl}/api/auth/register`, {
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        password: cleanPassword
+      });
+
+      registerUser(cleanName, cleanEmail, cleanPhone, cleanPassword);
+      onRegisterSuccess(res.data.user, res.data.token || 'auth-token');
+    } catch (err: any) {
+      const serverMsg = err.response?.data?.message;
+      if (serverMsg && serverMsg.includes('already exists')) {
+        setError(serverMsg);
       } else {
-        setError(result.error || 'Registration failed. Please try again.');
+        // Fallback to local user store
+        const result = registerUser(cleanName, cleanEmail, cleanPhone, cleanPassword);
+        if (result.success && result.user) {
+          onRegisterSuccess({ ...result.user, _id: result.user.id }, 'local-token');
+        } else {
+          setError(result.error || serverMsg || 'Registration failed. Please try again.');
+        }
       }
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   };
 
   const inputStyle: React.CSSProperties = {

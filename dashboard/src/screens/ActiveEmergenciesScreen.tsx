@@ -159,7 +159,7 @@ export const ActiveEmergenciesScreen: React.FC<ActiveEmergenciesScreenProps> = (
                   </div>
 
                   <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.5, marginBottom: '0.5rem' }}>
-                    <div>👤 <strong>Passenger:</strong> {emg.userName || 'Ishwari Gade'} ({emg.userPhone || '+91 9876543210'})</div>
+                    <div>👤 <strong>Passenger:</strong> {emg.userName || 'Passenger'} {emg.userPhone ? `(${emg.userPhone})` : ''}</div>
                     <div>📍 <strong>GPS Coordinates:</strong> {emg.currentLocation?.latitude?.toFixed(4)}, {emg.currentLocation?.longitude?.toFixed(4)} (Accuracy: {emg.currentLocation?.accuracy || 8}m)</div>
                     <div>🚔 <strong>Nearest Safe Location:</strong> <strong style={{ color: '#1e3a8a' }}>{emg.safeLocation?.name}</strong></div>
                     <div>🛣️ <strong>Road Distance:</strong> <strong style={{ color: '#2563eb' }}>{emg.routeDistanceKm} km</strong> • ⏱️ <strong>ETA:</strong> ~{emg.estimatedDurationMinutes} mins</div>
@@ -236,9 +236,9 @@ export const ActiveEmergenciesScreen: React.FC<ActiveEmergenciesScreenProps> = (
                       <strong style={{ color: '#dc2626' }}>{emg.emergencyId}</strong>
                     </td>
                     <td>
-                      <strong>{emg.userName || 'Ishwari Gade'}</strong>
+                      <strong>{emg.userName || 'Passenger'}</strong>
                       <br />
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{emg.userPhone || '+91 9876543210'}</span>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{emg.userPhone || ''}</span>
                     </td>
                     <td>
                       <span className="badge badge-critical">{emg.triggerType}</span>
@@ -306,8 +306,8 @@ export const ActiveEmergenciesScreen: React.FC<ActiveEmergenciesScreenProps> = (
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
               <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '0.85rem', borderRadius: '12px', fontSize: '0.82rem', lineHeight: 1.6 }}>
-                <div>👤 <strong>Passenger:</strong> {selectedEmergency.userName || 'Ishwari Gade'}</div>
-                <div>📞 <strong>Phone:</strong> {selectedEmergency.userPhone || '+91 9876543210'}</div>
+                <div>👤 <strong>Passenger:</strong> {selectedEmergency.userName || 'Passenger'}</div>
+                <div>📞 <strong>Phone:</strong> {selectedEmergency.userPhone || 'N/A'}</div>
                 <div>⚡ <strong>Trigger Type:</strong> <span className="badge badge-critical">{selectedEmergency.triggerType}</span></div>
                 <div>📍 <strong>Current Coordinates:</strong> {selectedEmergency.currentLocation?.latitude?.toFixed(5)}, {selectedEmergency.currentLocation?.longitude?.toFixed(5)}</div>
                 <div>🎯 <strong>Location Accuracy:</strong> {selectedEmergency.currentLocation?.accuracy || 8} meters</div>

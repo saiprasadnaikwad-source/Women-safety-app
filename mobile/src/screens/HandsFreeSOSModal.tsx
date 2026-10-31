@@ -65,9 +65,12 @@ export const HandsFreeSOSModal: React.FC<HandsFreeProps> = ({ onTriggerSOS, onCl
             <Mic size={22} color="#2563eb" />
             <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Voice Trigger Detection</h4>
           </div>
-          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.85rem' }}>
+          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.65rem' }}>
             Say emergency wake phrase <strong style={{ color: '#dc2626' }}>"Help me"</strong> or <strong>"Emergency"</strong> to activate SOS without touching your phone.
           </p>
+          <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', padding: '0.45rem 0.65rem', fontSize: '0.74rem', color: '#065f46', marginBottom: '0.85rem' }}>
+            ✅ <strong>Automatic Journey Protection:</strong> Voice detection turns on automatically in the background as soon as you start any journey!
+          </div>
 
           <button 
             className={`btn-large ${listening ? 'btn-danger' : 'btn-primary'}`}

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { ShieldCheck, AlertTriangle, Navigation, Phone, CheckCircle, Zap, X, Bug, ShieldAlert } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, Navigation, Phone, CheckCircle, Zap, X, Bug, ShieldAlert, Mic } from 'lucide-react';
 import axios from 'axios';
 import { calculateHaversineKm, fetchDynamicRoute } from '../services/routingService';
 import { calculateRemainingRoadDistanceKm, getCorridorOffsetMeters, calculateCircularHeadingDiff } from '../services/roadProgressService';
@@ -75,6 +75,13 @@ export const LiveJourneyScreen: React.FC<LiveJourneyProps> = ({
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [isLiveGpsActive, setIsLiveGpsActive] = useState(false);
 
+  // Background Hands-Free Voice SOS Listener
+  const [isVoiceListening, setIsVoiceListening] = useState(false);
+  const [voiceHeardPhrase, setVoiceHeardPhrase] = useState('');
+  const [voiceNotification, setVoiceNotification] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const isListeningActiveRef = useRef<boolean>(true);
+
   // Helper: Start/Trigger Emergency Response Mode
   const triggerEmergencyMode = async (
     triggerType: 'MANUAL_SOS' | 'ANOMALY_DETECTION' | 'ROUTE_DEVIATION' | 'OTHER' = 'MANUAL_SOS',
@@ -103,7 +110,106 @@ export const LiveJourneyScreen: React.FC<LiveJourneyProps> = ({
     }
     setEmergencySession(null);
     setIsEmergencyActive(false);
+    setVoiceNotification(null);
   };
+
+  // Automatic Background Hands-Free Voice SOS: runs automatically as soon as journey starts
+  useEffect(() => {
+    // If emergency is already active, stop listening to avoid repeat triggers
+    if (isEmergencyActive) {
+      isListeningActiveRef.current = false;
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+      }
+      setIsVoiceListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn('[VOICE SOS] Web Speech API not supported in this browser.');
+      return;
+    }
+
+    let isSubscribed = true;
+    isListeningActiveRef.current = true;
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        if (isSubscribed) {
+          setIsVoiceListening(true);
+          console.log('[VOICE SOS] Background voice detection active during journey.');
+        }
+      };
+
+      recognition.onresult = (event: any) => {
+        if (!isListeningActiveRef.current || isEmergencyActive) return;
+
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        transcript = transcript.trim().toLowerCase();
+
+        if (transcript) {
+          setVoiceHeardPhrase(transcript);
+        }
+
+        const keywords = ['help me', 'help', 'emergency', 'save me', 'bachao', 'please help', 'police'];
+        const matched = keywords.some(kw => transcript.includes(kw));
+
+        if (matched) {
+          console.log(`[VOICE SOS TRIGGERED] Emergency keyword matched: "${transcript}"`);
+          isListeningActiveRef.current = false;
+          setVoiceNotification(`🚨 Emergency phrase detected: "${transcript}". Triggering SOS...`);
+          try {
+            recognition.stop();
+          } catch (e) {}
+          setIsVoiceListening(false);
+
+          triggerEmergencyMode('MANUAL_SOS');
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        if (event.error !== 'no-speech') {
+          console.warn('[VOICE SOS] Speech recognition event error:', event.error);
+        }
+      };
+
+      recognition.onend = () => {
+        if (isSubscribed && isListeningActiveRef.current && !isEmergencyActive) {
+          try {
+            recognition.start();
+          } catch (e) {}
+        } else {
+          if (isSubscribed) setIsVoiceListening(false);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn('[VOICE SOS] Error initializing background speech recognition:', err);
+    }
+
+    return () => {
+      isSubscribed = false;
+      isListeningActiveRef.current = false;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {}
+        recognitionRef.current = null;
+      }
+      setIsVoiceListening(false);
+    };
+  }, [isEmergencyActive]);
 
   // Helper: Change Safe Location Category Priority (Police, Hospital, Fire Station)
   const handleChangeSafeCategory = async (category: string) => {
@@ -115,14 +221,27 @@ export const LiveJourneyScreen: React.FC<LiveJourneyProps> = ({
     let watchId: number | null = null;
 
     if ('geolocation' in navigator) {
+      // Immediate initial position fetch
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const liveLat = pos.coords.latitude;
+          const liveLng = pos.coords.longitude;
+          setCurrentPos([liveLat, liveLng]);
+          setGpsAccuracyMeters(pos.coords.accuracy || 10);
+          setIsLiveGpsActive(true);
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+      );
+
       watchId = navigator.geolocation.watchPosition(
         async (pos) => {
           const accuracy = pos.coords.accuracy || 10;
           setGpsAccuracyMeters(accuracy);
 
-          // Filter out poor GPS signals (> 50m) to prevent false alerts
-          if (accuracy > 50) {
-            console.warn(`[GPS FILTER] Poor GPS accuracy (${accuracy}m > 50m). Skipping telemetry update.`);
+          // Allow realistic browser positioning (filter only anomalies > 3000m)
+          if (accuracy > 3000) {
+            console.warn(`[GPS FILTER] Poor GPS accuracy (${accuracy}m > 3000m). Skipping telemetry update.`);
             return;
           }
 
@@ -460,8 +579,74 @@ export const LiveJourneyScreen: React.FC<LiveJourneyProps> = ({
           onResolve={handleResolveEmergencySession}
           onChangeCategory={handleChangeSafeCategory}
           tripDestination={tripData?.destination ? { name: tripData.destination.name, lat: tripData.destination.lat, lng: tripData.destination.lng } : undefined}
+          vehiclePlate={tripData?.plateNumber}
           onShareLocation={onShareLocation}
         />
+      )}
+
+      {/* Background Voice Trigger Alert Banner */}
+      {voiceNotification && (
+        <div style={{
+          backgroundColor: '#b91c1c',
+          color: '#ffffff',
+          padding: '0.55rem 1rem',
+          fontWeight: 700,
+          fontSize: '0.8rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          zIndex: 9999,
+          animation: 'pulse 1.5s infinite'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Mic size={18} />
+            <span>{voiceNotification}</span>
+          </div>
+          <button
+            onClick={() => setVoiceNotification(null)}
+            style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0 }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Background Voice SOS Status Bar */}
+      {!isEmergencyActive && (
+        <div style={{
+          backgroundColor: '#0f172a',
+          color: '#f8fafc',
+          padding: '0.45rem 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '0.73rem',
+          zIndex: 10,
+          borderBottom: '1px solid #1e293b'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: isVoiceListening ? '#22c55e' : '#f59e0b',
+              boxShadow: isVoiceListening ? '0 0 8px #22c55e' : 'none',
+              animation: isVoiceListening ? 'pulse 1.5s infinite' : 'none'
+            }} />
+            <span style={{ fontWeight: 600 }}>
+              {isVoiceListening ? (
+                <>🎙️ Hands-Free Voice SOS: <span style={{ color: '#86efac' }}>Listening</span> (Say <strong style={{ color: '#fef08a' }}>"Help me"</strong>)</>
+              ) : (
+                <>🎙️ Hands-Free Voice SOS: <span style={{ color: '#fbbf24' }}>Initializing...</span></>
+              )}
+            </span>
+          </div>
+          {voiceHeardPhrase && (
+            <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              "{voiceHeardPhrase}"
+            </span>
+          )}
+        </div>
       )}
 
       {/* Top Protection Banner (Normal Mode) */}

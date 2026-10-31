@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Shield, Mail, Lock, LogIn, Sparkles } from 'lucide-react';
+import axios from 'axios';
 import { loginUser } from '../services/userStore';
+import { getApiBaseUrl } from '../services/apiConfig';
 
 interface LoginProps {
   onLoginSuccess: (user: any, token: string) => void;
@@ -13,21 +15,34 @@ export const LoginScreen: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToRe
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    // Small timeout to show loading state
-    setTimeout(() => {
-      const user = loginUser(email.trim(), password);
-      if (user) {
-        onLoginSuccess(user, 'local-token');
-      } else {
-        setError('Invalid email or password. Please try again.');
+    try {
+      const baseUrl = getApiBaseUrl();
+      const res = await axios.post(`${baseUrl}/api/auth/login`, {
+        email: email.trim(),
+        password
+      });
+
+      if (res.data?.user) {
+        onLoginSuccess(res.data.user, res.data.token || 'auth-token');
+        return;
       }
-      setLoading(false);
-    }, 400);
+    } catch (err: any) {
+      console.warn('[LOGIN] Backend login failed, checking local user store.');
+    }
+
+    // Fallback to local user store
+    const localUser = loginUser(email.trim(), password);
+    if (localUser) {
+      onLoginSuccess({ ...localUser, _id: localUser.id }, 'local-token');
+    } else {
+      setError('Invalid email or password. Please try again.');
+    }
+    setLoading(false);
   };
 
   return (

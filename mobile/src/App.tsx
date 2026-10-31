@@ -45,7 +45,13 @@ export function App() {
   };
 
   const handleStartTrip = (tripData: any) => {
-    setPendingTripData(tripData);
+    const enrichedTrip = {
+      ...tripData,
+      userId: user?._id || user?.id || tripData.userId,
+      userName: user?.name || tripData.userName || 'Passenger',
+      userPhone: user?.phone || tripData.userPhone || ''
+    };
+    setPendingTripData(enrichedTrip);
     setShowVehicleVerification(true);
     setActiveTab('journey');
   };
@@ -169,9 +175,9 @@ export function App() {
           <button
             onClick={() => setShowHandsFreeModal(true)}
             style={{
-              backgroundColor: '#eff6ff',
-              color: '#2563eb',
-              border: '1px solid #bfdbfe',
+              backgroundColor: isJourneyMonitoring ? '#ecfdf5' : '#eff6ff',
+              color: isJourneyMonitoring ? '#059669' : '#2563eb',
+              border: `1px solid ${isJourneyMonitoring ? '#a7f3d0' : '#bfdbfe'}`,
               borderRadius: '9999px',
               padding: '0.35rem 0.75rem',
               fontSize: '0.72rem',
@@ -179,7 +185,7 @@ export function App() {
               cursor: 'pointer'
             }}
           >
-            Hands-Free SOS
+            {isJourneyMonitoring ? '🎙️ Voice SOS: Active' : 'Hands-Free SOS'}
           </button>
         )}
       </header>
@@ -202,7 +208,10 @@ export function App() {
             <LiveJourneyScreen
               tripData={activeTrip}
               user={user}
-              onTriggerSOS={() => setShowSOSCountdown(true)}
+              onTriggerSOS={() => {
+                setShowSOSCountdown(false);
+                setIsSOSActive(true);
+              }}
               onShareLocation={() => activeEmergencyId && startLiveLocationSharing(activeEmergencyId)}
               onEndJourney={() => {
                 stopLiveLocationSharing();
@@ -218,7 +227,7 @@ export function App() {
               onSkip={handleSkipVehicle}
             />
           ) : (
-            <StartJourneyScreen onStartMonitoring={handleStartTrip} />
+            <StartJourneyScreen user={user} onStartMonitoring={handleStartTrip} />
           )
         )}
 

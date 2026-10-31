@@ -297,8 +297,8 @@ export async function searchNearbySafeLocations(
  */
 export async function startEmergencySession(
   userId: string = 'user_demo_101',
-  userName: string = 'Ishwari Gade',
-  userPhone: string = '+91 9876543210',
+  userName: string = 'Passenger',
+  userPhone: string = '',
   triggerType: 'MANUAL_SOS' | 'ANOMALY_DETECTION' | 'ROUTE_DEVIATION' | 'OTHER' = 'MANUAL_SOS',
   currentLocation: { latitude: number; longitude: number; accuracy?: number; speed?: number },
   preferredCategory?: string,
@@ -468,8 +468,8 @@ export async function resolveEmergencySession(
     _id: incidentId,
     emergencyId: session.emergencyId,
     userId: session.userId,
-    userName: session.userName || 'Ishwari Gade',
-    userPhone: session.userPhone || '+91 9876543210',
+    userName: session.userName || 'Passenger',
+    userPhone: session.userPhone || '',
     vehicleId: 'BUS-102',
     type: session.triggerType === 'MANUAL_SOS' ? 'Manual SOS Emergency' : 'Route Deviation & ML Anomaly',
     riskLevel: 'CRITICAL' as const,

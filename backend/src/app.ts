@@ -69,7 +69,7 @@ setupSocketHandlers(io);
 const PORT = config.port;
 
 connectDatabase(config.mongoUri).then(() => {
-  server.listen(PORT, '0.0.0.0', () => {
+  server.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`=======================================================`);
     console.log(` Women Safety Transport System Backend Server Running`);
     console.log(` Port: http://localhost:${PORT}`);

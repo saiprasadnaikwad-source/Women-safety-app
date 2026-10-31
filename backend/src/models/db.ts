@@ -25,6 +25,8 @@ export interface ITrustedContact {
 export interface ITrip {
   _id: string;
   userId: string;
+  userName?: string;
+  userPhone?: string;
   source: { name: string; lat: number; lng: number };
   destination: { name: string; lat: number; lng: number };
   transportType: string;
@@ -219,7 +221,7 @@ class MemoryDatabase {
       expectedDuration: 35,
       startTime: new Date(),
       estimatedArrival: new Date(Date.now() + 35 * 60000),
-      status: 'active',
+      status: 'completed',
       currentRiskScore: 12,
       currentRiskLevel: 'LOW',
       createdAt: new Date()

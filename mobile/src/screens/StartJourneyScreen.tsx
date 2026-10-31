@@ -6,10 +6,11 @@ import { fetchDynamicRoute, RouteDetails } from '../services/routingService';
 import { getApiBaseUrl } from '../services/apiConfig';
 
 interface StartJourneyProps {
+  user?: any;
   onStartMonitoring: (tripData: any) => void;
 }
 
-export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ onStartMonitoring }) => {
+export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ user, onStartMonitoring }) => {
   const [sourceQuery, setSourceQuery] = useState('Pune Central Railway Station');
   const [destQuery, setDestQuery] = useState('Hinjewadi IT Park Phase 1');
   const [transportType, setTransportType] = useState('Bus');
@@ -20,6 +21,9 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ onStartMonitor
     lat: 18.5284,
     lng: 73.8739
   });
+
+  const [sourceSuggestions, setSourceSuggestions] = useState<GeocodedLocation[]>([]);
+  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
 
   const [selectedDestGeo, setSelectedDestGeo] = useState<GeocodedLocation | null>({
     name: 'Hinjewadi IT Park Phase 1',
@@ -46,37 +50,90 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ onStartMonitor
   ];
 
   const handleUseCurrentLocation = () => {
-    if (!('geolocation' in navigator)) return;
+    if (!('geolocation' in navigator)) {
+      setErrorMsg('Geolocation is not supported by your browser.');
+      return;
+    }
     setFetchingGps(true);
     setErrorMsg('');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = Number(pos.coords.latitude.toFixed(5));
-        const lng = Number(pos.coords.longitude.toFixed(5));
-        // Reverse geocode via Nominatim
-        let name = 'My Current Location';
-        let formattedAddress = `${lat}, ${lng}`;
-        try {
-          const res = await axios.get(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-            { headers: { 'User-Agent': 'WomenSafetyApp/1.0' }, timeout: 4000 }
-          );
-          if (res.data?.display_name) {
-            formattedAddress = res.data.display_name;
-            name = res.data.address?.road || res.data.address?.suburb || res.data.display_name.split(',')[0];
-          }
-        } catch {
-          console.warn('[GEOCODING] Reverse geocode failed, using coordinates.');
+
+    const applyPosition = async (lat: number, lng: number) => {
+      let name = `Current Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+      let formattedAddress = `Live GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+      try {
+        const res = await axios.get(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+          { headers: { 'User-Agent': 'WomenSafetyApp/1.0' }, timeout: 4000 }
+        );
+        if (res.data?.display_name) {
+          formattedAddress = res.data.display_name;
+          name = res.data.address?.suburb || res.data.address?.city || res.data.address?.road || res.data.display_name.split(',')[0];
         }
-        const userPos: GeocodedLocation = { name, formattedAddress, lat, lng };
-        setSourceGeo(userPos);
-        setSourceQuery(name);
-        setFetchingGps(false);
+      } catch {
+        console.warn('[GEOCODING] Reverse geocoding timed out, using coordinates.');
+      }
+
+      const userPos: GeocodedLocation = { name, formattedAddress, lat, lng };
+      setSourceGeo(userPos);
+      setSourceQuery(name);
+      setFetchingGps(false);
+    };
+
+    // 1. Try high accuracy GPS first
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        applyPosition(pos.coords.latitude, pos.coords.longitude);
       },
-      () => { setErrorMsg('Could not get GPS location. Please allow location access.'); setFetchingGps(false); },
-      { enableHighAccuracy: true, timeout: 8000 }
+      () => {
+        // 2. High accuracy timed out / unavailable; try standard Wi-Fi/cellular position
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            applyPosition(pos.coords.latitude, pos.coords.longitude);
+          },
+          async () => {
+            // 3. Fallback to IP Geolocation if browser permission denied
+            try {
+              const ipRes = await axios.get('https://ipapi.co/json/', { timeout: 4000 });
+              if (ipRes.data && ipRes.data.latitude && ipRes.data.longitude) {
+                const lat = Number(ipRes.data.latitude);
+                const lng = Number(ipRes.data.longitude);
+                const city = ipRes.data.city || ipRes.data.region || 'Current Location';
+                const formattedAddress = `${city}, ${ipRes.data.region || ''}, ${ipRes.data.country_name || ''}`;
+                setSourceGeo({ name: city, formattedAddress, lat, lng });
+                setSourceQuery(city);
+                setFetchingGps(false);
+                return;
+              }
+            } catch (ipErr) {
+              console.warn('[IP GEOLOCATION FAILED]', ipErr);
+            }
+            setErrorMsg('Could not get GPS location. Please allow browser location access or search your place.');
+            setFetchingGps(false);
+          },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
+        );
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
   };
+
+  // Fetch suggestions for Starting Point search input
+  useEffect(() => {
+    if (!sourceQuery || sourceQuery.length < 2 || sourceQuery === sourceGeo.name) {
+      setSourceSuggestions([]);
+      setShowSourceDropdown(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const suggestions = await searchPlaceSuggestions(sourceQuery);
+      setSourceSuggestions(suggestions);
+      setShowSourceDropdown(suggestions.length > 0);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [sourceQuery, sourceGeo.name]);
 
   // Fetch Place Autocomplete suggestions when destination search input changes
   useEffect(() => {
@@ -120,6 +177,12 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ onStartMonitor
     computeRoute();
   }, [sourceGeo, selectedDestGeo]);
 
+  const handleSelectSourceSuggestion = (place: GeocodedLocation) => {
+    setSourceQuery(place.name);
+    setSourceGeo(place);
+    setShowSourceDropdown(false);
+  };
+
   const handleSelectSuggestion = (place: GeocodedLocation) => {
     setDestQuery(place.name);
     setSelectedDestGeo(place);
@@ -132,6 +195,9 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ onStartMonitor
     const formattedRoute = routeDetails.polyline.map((p) => ({ lat: p[0], lng: p[1] }));
 
     const payload = {
+      userId: user?._id || user?.id || `user_${Date.now()}`,
+      userName: user?.name || 'Passenger',
+      userPhone: user?.phone || '',
       source: { name: sourceGeo.name, lat: sourceGeo.lat, lng: sourceGeo.lng },
       destination: {
         name: selectedDestGeo.name,
@@ -144,7 +210,6 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ onStartMonitor
       expectedDistanceKm: routeDetails.routeDistanceKm,
       expectedRoute: formattedRoute,
       routingProvider: routeDetails.provider
-      // plateNumber and vehicleId are added by App.tsx after OCR verification
     };
 
     let journeyId = `trip_${Date.now()}`;
@@ -182,9 +247,9 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ onStartMonitor
         )}
 
         {/* Source Input */}
-        <div style={{ marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '1rem', position: 'relative' }}>
           <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
-            Starting Point
+            Starting Point (Use GPS or Search Place)
           </label>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: 1 }}>
@@ -192,8 +257,14 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ onStartMonitor
               <input
                 type="text"
                 value={sourceQuery}
-                onChange={(e) => setSourceQuery(e.target.value)}
-                placeholder="Origin location..."
+                onChange={(e) => {
+                  setSourceQuery(e.target.value);
+                  if (sourceGeo && e.target.value !== sourceGeo.name) {
+                    setShowSourceDropdown(true);
+                  }
+                }}
+                onFocus={() => { if (sourceSuggestions.length > 0) setShowSourceDropdown(true); }}
+                placeholder="Origin location or search..."
                 style={{
                   width: '100%',
                   padding: '0.75rem 0.75rem 0.75rem 2.4rem',
@@ -208,7 +279,7 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ onStartMonitor
               type="button"
               onClick={handleUseCurrentLocation}
               disabled={fetchingGps}
-              title="Use my current GPS location"
+              title="Use my exact current live GPS location"
               style={{
                 backgroundColor: fetchingGps ? '#e2e8f0' : '#eff6ff',
                 color: fetchingGps ? '#94a3b8' : '#2563eb',
@@ -231,9 +302,45 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ onStartMonitor
               {fetchingGps ? 'Locating...' : 'Use GPS'}
             </button>
           </div>
-          {sourceGeo.name !== 'Pune Central Station' && sourceGeo.name !== 'Current Live GPS Location' && (
+
+          {/* Source Autocomplete Dropdown */}
+          {showSourceDropdown && sourceSuggestions.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '12px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              zIndex: 100,
+              maxHeight: '200px',
+              overflowY: 'auto',
+              marginTop: '4px'
+            }}>
+              {sourceSuggestions.map((place, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => handleSelectSourceSuggestion(place)}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    borderBottom: idx < sourceSuggestions.length - 1 ? '1px solid #f1f5f9' : 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                  className="suggestion-item"
+                >
+                  <strong style={{ color: '#0f172a', display: 'block' }}>{place.name}</strong>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{place.formattedAddress}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {sourceGeo && (
             <p style={{ fontSize: '0.72rem', color: '#16a34a', marginTop: '0.3rem', fontWeight: 600 }}>
-              📍 {sourceGeo.formattedAddress}
+              📍 Starting from: {sourceGeo.formattedAddress || sourceGeo.name}
             </p>
           )}
         </div>

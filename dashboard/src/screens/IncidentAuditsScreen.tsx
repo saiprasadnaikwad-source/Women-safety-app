@@ -141,9 +141,9 @@ export const IncidentAuditsScreen: React.FC<IncidentAuditsScreenProps> = ({ inci
                       <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Trip: {inc.tripId || 'trip_demo_501'}</span>
                     </td>
                     <td>
-                      <strong>{inc.userName || 'Ishwari Gade'}</strong>
+                      <strong>{inc.userName || 'Passenger'}</strong>
                       <br />
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{inc.vehicleId || 'BUS-102'} ({inc.userPhone || '+91 9876543210'})</span>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{inc.vehicleId || 'BUS-102'} {inc.userPhone ? `(${inc.userPhone})` : ''}</span>
                     </td>
                     <td>{inc.type}</td>
                     <td>

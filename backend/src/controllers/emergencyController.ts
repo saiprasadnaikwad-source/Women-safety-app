@@ -34,8 +34,9 @@ export async function getNearbySafeLocations(req: Request, res: Response) {
 export async function handleStartEmergency(req: AuthRequest, res: Response) {
   try {
     const userId = req.user ? req.user.userId : req.body.userId || 'user_demo_101';
-    const userName = req.body.userName || 'Ishwari Gade';
-    const userPhone = req.body.userPhone || '+91 9876543210';
+    const user = dbStore.users.get(userId);
+    const userName = req.body.userName || user?.name || 'Passenger';
+    const userPhone = req.body.userPhone || user?.phone || '';
     const triggerType = req.body.triggerType || 'MANUAL_SOS';
     const currentLocation = req.body.currentLocation || { latitude: 18.5284, longitude: 73.8739 };
     const preferredCategory = req.body.preferredCategory;
@@ -151,7 +152,7 @@ export async function handleShareLocation(req: AuthRequest, res: Response) {
 
     const result = await sendLiveLocationShareToContacts(userId, latitude, longitude, emergencyId);
     console.log(`[SHARE] Result:`, result);
-    res.json({ message: 'Live location shared with contacts', ...result, smsContacts: result.contacts, smsMessage: result.message });
+    res.json({ ...result, success: true, smsContacts: result.contacts, smsMessage: result.message });
   } catch (error: any) {
     console.error('[SHARE ERROR]', error.message);
     res.status(500).json({ error: 'Failed to share location', details: error.message });

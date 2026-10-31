@@ -52,8 +52,8 @@ export async function getDashboardJourneys(req: AuthRequest, res: Response) {
         _id: trip._id,
         journeyId: trip._id,
         userId: trip.userId,
-        userName: user ? user.name : 'Ishwari Gade',
-        userPhone: user ? user.phone : '+91 9876543210',
+        userName: trip.userName || (user ? user.name : 'Passenger'),
+        userPhone: trip.userPhone || (user ? user.phone : ''),
         vehicleId: trip._id === 'trip_demo_501' ? 'BUS-102' : 'VEHICLE-A101',
         transportType: trip.transportType || 'Bus',
         source: trip.source,
@@ -101,8 +101,8 @@ export async function getDashboardAlerts(req: AuthRequest, res: Response) {
     return {
       emergencyId: s._id,
       userId: s.userId,
-      userName: user ? user.name : 'Ishwari Gade',
-      userPhone: user ? user.phone : '+91 9876543210',
+      userName: (trip && trip.userName) || (user ? user.name : 'Passenger'),
+      userPhone: (trip && trip.userPhone) || (user ? user.phone : ''),
       vehicleId: 'BUS-102',
       transportType: trip ? trip.transportType : 'Mobile SOS',
       currentLocation: { latitude: s.latitude, longitude: s.longitude, accuracy: 8 },
@@ -136,8 +136,8 @@ export async function getDashboardIncidents(req: AuthRequest, res: Response) {
   const incidents = Array.from(dbStore.incidents.values()).map(inc => {
     return {
       ...inc,
-      userName: inc.userName || 'Ishwari Gade',
-      userPhone: inc.userPhone || '+91 9876543210',
+      userName: inc.userName || 'Passenger',
+      userPhone: inc.userPhone || '',
       vehicleId: inc.vehicleId || 'BUS-102',
       status: inc.status || 'Resolved'
     };
