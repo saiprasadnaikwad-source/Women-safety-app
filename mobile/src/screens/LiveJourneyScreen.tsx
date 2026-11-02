@@ -211,6 +211,57 @@ export const LiveJourneyScreen: React.FC<LiveJourneyProps> = ({
     };
   }, [isEmergencyActive]);
 
+  // Physical Phone Shake Gesture Detection (Accelerometer) during journey
+  useEffect(() => {
+    let lastX = 0, lastY = 0, lastZ = 0;
+    let lastUpdate = 0;
+    let shakeCount = 0;
+    let lastShakeTime = 0;
+
+    const handleMotion = (event: DeviceMotionEvent) => {
+      if (isEmergencyActive) return;
+      const current = event.accelerationIncludingGravity;
+      if (!current || current.x === null || current.y === null || current.z === null) return;
+
+      const curTime = Date.now();
+      if ((curTime - lastUpdate) > 100) {
+        const diffTime = curTime - lastUpdate;
+        lastUpdate = curTime;
+
+        const delta = Math.abs(current.x + current.y + current.z - lastX - lastY - lastZ) / diffTime * 10000;
+
+        if (delta > 25) { // Vigorous shake threshold
+          const now = Date.now();
+          if (now - lastShakeTime < 1200) {
+            shakeCount++;
+            if (shakeCount >= 2) {
+              console.log('[SHAKE GESTURE DETECTED] Triggering emergency mode');
+              triggerEmergencyMode('MANUAL_SOS');
+              shakeCount = 0;
+            }
+          } else {
+            shakeCount = 1;
+          }
+          lastShakeTime = now;
+        }
+
+        lastX = current.x;
+        lastY = current.y;
+        lastZ = current.z;
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'DeviceMotionEvent' in window) {
+      window.addEventListener('devicemotion', handleMotion);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('devicemotion', handleMotion);
+      }
+    };
+  }, [isEmergencyActive]);
+
   // Helper: Change Safe Location Category Priority (Police, Hospital, Fire Station)
   const handleChangeSafeCategory = async (category: string) => {
     await triggerEmergencyMode('MANUAL_SOS', category);
@@ -539,7 +590,8 @@ export const LiveJourneyScreen: React.FC<LiveJourneyProps> = ({
 
     // Call Express backend & Python ML service on port 8000
     try {
-      const res = await axios.post('http://localhost:5000/api/trips/trip_demo_501/location', {
+      const currentTripId = tripData?._id || 'trip_demo_501';
+      const res = await axios.post(`${getApiBaseUrl()}/api/trips/${currentTripId}/location`, {
         latitude: lat,
         longitude: lng,
         speed,

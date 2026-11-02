@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, Navigation, Users, Activity, User, ShieldCheck, AlertOctagon } from 'lucide-react';
+import { Home, Navigation, Users, Activity, User, AlertOctagon } from 'lucide-react';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { RegisterScreen } from './screens/RegisterScreen';
@@ -15,7 +15,10 @@ import { PrivacyScreen } from './screens/PrivacyScreen';
 import { HandsFreeSOSModal } from './screens/HandsFreeSOSModal';
 import { SOSCountdownModal } from './components/SOSCountdownModal';
 import axios from 'axios';
+import { getApiBaseUrl } from './services/apiConfig';
 import { sendEmergencyLocationUpdate } from './services/emergencyService';
+
+const swarakshaLogo = new URL('./assets/swaraksha-logo.png', import.meta.url).href;
 
 export function App() {
   const [showOnboarding, setShowOnboarding] = useState(true);
@@ -109,7 +112,7 @@ export function App() {
     const destName = activeTrip?.destination?.name || '';
 
     // Only create the emergency session — no SMS, no live location yet
-    axios.post('http://localhost:5000/api/emergency/start', {
+    axios.post(`${getApiBaseUrl()}/api/emergency/start`, {
       userId: user?._id,
       userName: user?.name,
       userPhone: user?.phone,
@@ -155,9 +158,9 @@ export function App() {
       {/* Top Header */}
       <header className="app-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <ShieldCheck size={26} color="#2563eb" />
+          <img src={swarakshaLogo} alt="" style={{ width: '38px', height: '32px', objectFit: 'contain' }} />
           <div className="header-user">
-            <h2>JourneyGuard</h2>
+            <h2>SwaRaksha</h2>
             <p><span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#16a34a', display: 'inline-block' }} /> Protection Active</p>
           </div>
         </div>

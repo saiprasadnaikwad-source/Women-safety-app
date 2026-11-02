@@ -38,7 +38,20 @@ jobs:
 
       - name: Build app
         working-directory: ./mobile
-        run: npm run build
+        env:
+          # Backend API base URL baked into the frontend bundle at build time.
+          # Set the VITE_API_BASE_URL repository variable (Settings → Secrets and
+          # variables → Actions → Variables) to the live backend URL, e.g.
+          # https://<your-backend>.onrender.com
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_SOCKET_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "VITE_API_BASE_URL variable not set in repository, defaulting to Render live backend."
+            export VITE_API_BASE_URL="https://women-safety-app-7qc1.onrender.com"
+            export VITE_SOCKET_URL="https://women-safety-app-7qc1.onrender.com"
+          fi
+          npm run build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

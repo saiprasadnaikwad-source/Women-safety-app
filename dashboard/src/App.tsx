@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Shield, Navigation, AlertTriangle, FileText, Activity, RefreshCw } from 'lucide-react';
+import { Navigation, AlertTriangle, FileText, Activity, RefreshCw } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import axios from 'axios';
 import { MetricsHeader } from './components/MetricsHeader';
 import { MapComponent } from './components/MapComponent';
 import { AlertsTable } from './components/AlertsTable';
 import { MLTelemetryPanel } from './components/MLTelemetryPanel';
+
+const swarakshaLogo = new URL('./assets/swaraksha-logo.png', import.meta.url).href;
 import { LiveJourneysScreen } from './screens/LiveJourneysScreen';
 import { ActiveEmergenciesScreen } from './screens/ActiveEmergenciesScreen';
 import { IncidentAuditsScreen } from './screens/IncidentAuditsScreen';
 
-const BACKEND_URL = 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' && window.location.hostname && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.')) ? `http://${window.location.hostname}:5000` : 'https://women-safety-app-7qc1.onrender.com');
 
 export function App() {
   const [activeModule, setActiveModule] = useState<'overview' | 'journeys' | 'emergencies' | 'incidents'>('overview');
@@ -241,7 +243,7 @@ export function App() {
       {/* Sidebar Navigation */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <Shield size={26} color="#2563eb" />
+          <img src={swarakshaLogo} alt="" style={{ width: '40px', height: '32px', objectFit: 'contain' }} />
           <span>Transport Safety Authority</span>
         </div>
 

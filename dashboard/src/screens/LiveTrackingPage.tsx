@@ -4,7 +4,9 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 
-const BACKEND_URL = 'http://localhost:5000';
+const swarakshaLogo = new URL('../assets/swaraksha-logo.png', import.meta.url).href;
+
+const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' && window.location.hostname && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.')) ? `http://${window.location.hostname}:5000` : 'https://women-safety-app-7qc1.onrender.com');
 
 interface TrackingData {
   tripId: string;
@@ -167,9 +169,9 @@ export function LiveTrackingPage() {
       {/* Header */}
       <div style={{ backgroundColor: '#0f172a', color: '#fff', padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          <span style={{ fontSize: '1.4rem' }}>🛡️</span>
+          <img src={swarakshaLogo} alt="" style={{ width: '40px', height: '32px', objectFit: 'contain' }} />
           <div>
-            <div style={{ fontWeight: 800, fontSize: '1rem' }}>JourneyGuard Live Tracking</div>
+            <div style={{ fontWeight: 800, fontSize: '1rem' }}>SwaRaksha Live Tracking</div>
             <div style={{ fontSize: '0.72rem', opacity: 0.7 }}>
               {tracking ? `${tracking.userName} • ${tracking.source.name} → ${tracking.destination.name}` : 'Loading...'}
             </div>

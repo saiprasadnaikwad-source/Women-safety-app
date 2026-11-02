@@ -49,6 +49,8 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ user, onStartM
     { label: 'Other', icon: <Navigation size={20} /> }
   ];
 
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+
   const handleUseCurrentLocation = () => {
     if (!('geolocation' in navigator)) {
       setErrorMsg('Geolocation is not supported by your browser.');
@@ -57,66 +59,87 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ user, onStartM
     setFetchingGps(true);
     setErrorMsg('');
 
-    const applyPosition = async (lat: number, lng: number) => {
-      let name = `Current Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
-      let formattedAddress = `Live GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    const applyPosition = (lat: number, lng: number, accuracy?: number, fallbackLabel?: string) => {
+      if (accuracy) setGpsAccuracy(Math.round(accuracy));
+      const accText = accuracy ? ` (±${Math.round(accuracy)}m)` : '';
+      const initialName = fallbackLabel || `Live Location${accText}`;
+      const initialAddress = `Live GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}${accText}`;
 
-      try {
-        const res = await axios.get(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-          { headers: { 'User-Agent': 'WomenSafetyApp/1.0' }, timeout: 4000 }
-        );
-        if (res.data?.display_name) {
-          formattedAddress = res.data.display_name;
-          name = res.data.address?.suburb || res.data.address?.city || res.data.address?.road || res.data.display_name.split(',')[0];
-        }
-      } catch {
-        console.warn('[GEOCODING] Reverse geocoding timed out, using coordinates.');
-      }
-
-      const userPos: GeocodedLocation = { name, formattedAddress, lat, lng };
+      // 1. Immediately apply coordinates so user gets real-time position
+      const userPos: GeocodedLocation = { name: initialName, formattedAddress: initialAddress, lat, lng };
       setSourceGeo(userPos);
-      setSourceQuery(name);
+      setSourceQuery(initialName);
       setFetchingGps(false);
+      setErrorMsg('');
+
+      // 2. Asynchronously enrich with reverse geocoding in background
+      axios.get(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=17&addressdetails=1`,
+        { timeout: 4000 }
+      ).then((res) => {
+        if (res.data?.display_name) {
+          const addr = res.data.address;
+          const locality = addr?.suburb || addr?.neighbourhood || addr?.quarter || addr?.residential || addr?.city_district || addr?.road || addr?.town || addr?.city || res.data.display_name.split(',')[0];
+          const enrichedAddress = res.data.display_name;
+          setSourceGeo({ name: locality, formattedAddress: enrichedAddress, lat, lng });
+          setSourceQuery(locality);
+        }
+      }).catch(() => {
+        // Fallback remains the live coordinates
+      });
     };
 
-    // 1. Try high accuracy GPS first
+    // FORCE fresh live position (maximumAge: 0 forces browser/device to acquire a fresh fix instead of reading stored cache)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        applyPosition(pos.coords.latitude, pos.coords.longitude);
+        applyPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
       },
-      () => {
-        // 2. High accuracy timed out / unavailable; try standard Wi-Fi/cellular position
+      (err) => {
+        if (err.code === 1) { // PERMISSION_DENIED
+          setErrorMsg('Location permission denied. Please allow location access in your browser or tap a quick location below.');
+          setFetchingGps(false);
+          return;
+        }
+
+        // Try standard cellular / Wi-Fi if high accuracy satellite timed out
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            applyPosition(pos.coords.latitude, pos.coords.longitude);
+            applyPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
           },
           async () => {
-            // 3. Fallback to IP Geolocation if browser permission denied
+            // Fallback: IP-based live geolocation
             try {
               const ipRes = await axios.get('https://ipapi.co/json/', { timeout: 4000 });
               if (ipRes.data && ipRes.data.latitude && ipRes.data.longitude) {
                 const lat = Number(ipRes.data.latitude);
                 const lng = Number(ipRes.data.longitude);
                 const city = ipRes.data.city || ipRes.data.region || 'Current Location';
-                const formattedAddress = `${city}, ${ipRes.data.region || ''}, ${ipRes.data.country_name || ''}`;
-                setSourceGeo({ name: city, formattedAddress, lat, lng });
-                setSourceQuery(city);
-                setFetchingGps(false);
+                applyPosition(lat, lng, undefined, city);
                 return;
               }
             } catch (ipErr) {
               console.warn('[IP GEOLOCATION FAILED]', ipErr);
             }
-            setErrorMsg('Could not get GPS location. Please allow browser location access or search your place.');
+            setErrorMsg('Could not get fresh GPS fix. Please tap a location pill below or search your place.');
             setFetchingGps(false);
           },
-          { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
         );
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   };
+
+  // Auto-detect current location on mount if user has already granted permission
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'permissions' in navigator && navigator.permissions?.query) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((status) => {
+        if (status.state === 'granted') {
+          handleUseCurrentLocation();
+        }
+      }).catch(() => {});
+    }
+  }, []);
 
   // Fetch suggestions for Starting Point search input
   useEffect(() => {
@@ -263,7 +286,7 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ user, onStartM
                     setShowSourceDropdown(true);
                   }
                 }}
-                onFocus={() => { if (sourceSuggestions.length > 0) setShowSourceDropdown(true); }}
+                onFocus={() => setShowSourceDropdown(true)}
                 placeholder="Origin location or search..."
                 style={{
                   width: '100%',
@@ -304,7 +327,7 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ user, onStartM
           </div>
 
           {/* Source Autocomplete Dropdown */}
-          {showSourceDropdown && sourceSuggestions.length > 0 && (
+          {showSourceDropdown && (
             <div style={{
               position: 'absolute',
               top: '100%',
@@ -315,10 +338,38 @@ export const StartJourneyScreen: React.FC<StartJourneyProps> = ({ user, onStartM
               borderRadius: '12px',
               boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
               zIndex: 100,
-              maxHeight: '200px',
+              maxHeight: '240px',
               overflowY: 'auto',
               marginTop: '4px'
             }}>
+              {/* One-tap live GPS location option */}
+              <div
+                onClick={() => {
+                  setShowSourceDropdown(false);
+                  handleUseCurrentLocation();
+                }}
+                style={{
+                  padding: '0.75rem 1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  backgroundColor: '#f0fdf4',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  color: '#16a34a',
+                  fontWeight: 700
+                }}
+              >
+                <LocateFixed size={16} />
+                <div>
+                  <div>Use Current Live Location</div>
+                  <div style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 500 }}>
+                    {fetchingGps ? 'Locating device...' : 'Detect via GPS / Wi-Fi'}
+                  </div>
+                </div>
+              </div>
+
               {sourceSuggestions.map((place, idx) => (
                 <div
                   key={idx}

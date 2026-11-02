@@ -45,6 +45,57 @@ export const HandsFreeSOSModal: React.FC<HandsFreeProps> = ({ onTriggerSOS, onCl
     };
   }, [listening, onTriggerSOS]);
 
+  // Real Hardware Accelerometer Phone Shake Detection
+  useEffect(() => {
+    let lastX = 0, lastY = 0, lastZ = 0;
+    let lastUpdate = 0;
+    let shakeCount = 0;
+    let lastShakeTime = 0;
+
+    const threshold = Math.max(15, 35 - shakeSensitivity * 2);
+
+    const handleMotion = (event: DeviceMotionEvent) => {
+      const current = event.accelerationIncludingGravity;
+      if (!current || current.x === null || current.y === null || current.z === null) return;
+
+      const curTime = Date.now();
+      if ((curTime - lastUpdate) > 100) {
+        const diffTime = curTime - lastUpdate;
+        lastUpdate = curTime;
+
+        const delta = Math.abs(current.x + current.y + current.z - lastX - lastY - lastZ) / diffTime * 10000;
+
+        if (delta > threshold) {
+          const now = Date.now();
+          if (now - lastShakeTime < 1200) {
+            shakeCount++;
+            if (shakeCount >= 2) {
+              onTriggerSOS('shake_gesture');
+              shakeCount = 0;
+            }
+          } else {
+            shakeCount = 1;
+          }
+          lastShakeTime = now;
+        }
+
+        lastX = current.x;
+        lastY = current.y;
+        lastZ = current.z;
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'DeviceMotionEvent' in window) {
+      window.addEventListener('devicemotion', handleMotion);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('devicemotion', handleMotion);
+      }
+    };
+  }, [shakeSensitivity, onTriggerSOS]);
+
   const handleSimulateShake = () => {
     onTriggerSOS('shake_gesture');
   };

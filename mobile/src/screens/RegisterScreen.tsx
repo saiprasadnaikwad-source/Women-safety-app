@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Shield, Mail, Lock, User, Phone, UserPlus } from 'lucide-react';
+import { Mail, Lock, User, Phone, UserPlus } from 'lucide-react';
 import axios from 'axios';
 import { registerUser } from '../services/userStore';
 import { getApiBaseUrl } from '../services/apiConfig';
+
+const swarakshaLogo = new URL('../assets/swaraksha-logo.png', import.meta.url).href;
 
 interface RegisterProps {
   onRegisterSuccess: (user: any, token: string) => void;
@@ -97,22 +99,13 @@ export const RegisterScreen: React.FC<RegisterProps> = ({ onRegisterSuccess, onS
       }}>
         {/* Logo & Title */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{
-            width: '72px',
-            height: '72px',
-            borderRadius: '20px',
-            background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
-            color: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 1rem',
-            boxShadow: '0 8px 24px rgba(59,130,246,0.4)',
-          }}>
-            <Shield size={38} />
-          </div>
+          <img
+            src={swarakshaLogo}
+            alt="SwaRaksha logo"
+            style={{ width: '112px', height: '88px', objectFit: 'contain', display: 'block', margin: '0 auto 0.5rem' }}
+          />
           <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Create Account</h2>
-          <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.35rem' }}>JourneyGuard Women Safety System</p>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.35rem' }}>SwaRaksha Women Safety System</p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

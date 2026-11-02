@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { ShieldCheck, Phone, Navigation, MapPin } from 'lucide-react';
 import axios from 'axios';
+import { getApiBaseUrl } from '../services/apiConfig';
 
 export const SafeLocationsScreen: React.FC = () => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -10,7 +11,7 @@ export const SafeLocationsScreen: React.FC = () => {
 
   useEffect(() => {
     // Fetch verified safe locations from backend
-    axios.get('http://localhost:5000/api/safe-locations')
+    axios.get(`${getApiBaseUrl()}/api/safe-locations`)
       .then(res => setLocations(res.data))
       .catch(() => {
         // Fallback default safe locations

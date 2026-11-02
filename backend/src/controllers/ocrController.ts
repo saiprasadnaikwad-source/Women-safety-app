@@ -1,8 +1,9 @@
 import { Response } from 'express';
 import axios from 'axios';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { config } from '../config';
 
-const OCR_MODEL_URL = process.env.OCR_MODEL_URL || 'http://localhost:8001';
+const OCR_MODEL_URL = config.ocrModelUrl;
 
 export async function detectPlate(req: AuthRequest, res: Response) {
   try {

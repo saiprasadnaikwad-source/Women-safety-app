@@ -157,20 +157,273 @@ export interface IEmergencySession {
 // Load real contacts from JSON file
 import realContactsData from '../data/contacts.json';
 
-// In-Memory Database Store as reliable fallback
+// Mongoose Schemas & Persistent Database Models
+const userSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  phone: { type: String, required: true },
+  passwordHash: { type: String, required: true },
+  profilePhoto: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+}, { _id: false, timestamps: true });
+
+const contactSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  userId: { type: String, required: true },
+  name: { type: String, required: true },
+  phone: { type: String, required: true },
+  relationship: { type: String, required: true },
+  isPrimary: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+}, { _id: false });
+
+const tripSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  userId: { type: String, required: true },
+  userName: { type: String },
+  userPhone: { type: String },
+  source: { type: Object, required: true },
+  destination: { type: Object, required: true },
+  transportType: { type: String, default: 'Bus' },
+  expectedRoute: { type: Array, default: [] },
+  expectedDuration: { type: Number, default: 35 },
+  startTime: { type: Date, default: Date.now },
+  estimatedArrival: { type: Date },
+  status: { type: String, default: 'active' },
+  currentRiskScore: { type: Number, default: 0 },
+  currentRiskLevel: { type: String, default: 'LOW' },
+  createdAt: { type: Date, default: Date.now }
+}, { _id: false });
+
+const locationUpdateSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  tripId: { type: String, required: true },
+  userId: { type: String, required: true },
+  latitude: { type: Number, required: true },
+  longitude: { type: Number, required: true },
+  speed: { type: Number, default: 0 },
+  direction: { type: Number, default: 0 },
+  timestamp: { type: Date, default: Date.now }
+}, { _id: false });
+
+const anomalyEventSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  tripId: { type: String, required: true },
+  userId: { type: String, required: true },
+  riskScore: { type: Number, required: true },
+  anomaly: { type: Boolean, required: true },
+  reason: { type: String },
+  features: { type: Object },
+  latitude: { type: Number },
+  longitude: { type: Number },
+  timestamp: { type: Date, default: Date.now },
+  status: { type: String, default: 'new' }
+}, { _id: false });
+
+const sosEventSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  userId: { type: String, required: true },
+  tripId: { type: String },
+  latitude: { type: Number, required: true },
+  longitude: { type: Number, required: true },
+  activationMethod: { type: String, default: 'discreet_button' },
+  status: { type: String, default: 'ACTIVE' },
+  createdAt: { type: Date, default: Date.now },
+  resolvedAt: { type: Date }
+}, { _id: false });
+
+const incidentSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  emergencyId: { type: String },
+  userId: { type: String, required: true },
+  userName: { type: String },
+  userPhone: { type: String },
+  vehicleId: { type: String },
+  tripId: { type: String },
+  type: { type: String },
+  riskLevel: { type: String },
+  riskScore: { type: Number },
+  description: { type: String },
+  location: { type: Object },
+  initialLocation: { type: Object },
+  safeLocation: { type: Object },
+  evidence: { type: Object },
+  status: { type: String, default: 'Detected' },
+  createdAt: { type: Date, default: Date.now },
+  resolvedAt: { type: Date },
+  durationMinutes: { type: Number },
+  safetyEvents: { type: Array, default: [] },
+  mlFeatures: { type: Object },
+  isolationForestStatus: { type: String }
+}, { _id: false });
+
+const emergencySessionSchema = new mongoose.Schema({
+  emergencyId: { type: String, required: true, unique: true },
+  userId: { type: String, required: true },
+  userName: { type: String },
+  userPhone: { type: String },
+  triggerType: { type: String, default: 'MANUAL_SOS' },
+  emergencyStatus: { type: String, default: 'EMERGENCY_DETECTED' },
+  startedAt: { type: Date, default: Date.now },
+  resolvedAt: { type: Date },
+  currentLocation: { type: Object },
+  safeLocation: { type: Object },
+  routeDistanceMeters: { type: Number, default: 0 },
+  routeDistanceKm: { type: Number, default: 0 },
+  estimatedDurationSeconds: { type: Number, default: 0 },
+  estimatedDurationMinutes: { type: Number, default: 0 },
+  routeCoordinates: { type: Array, default: [] },
+  liveLocationEnabled: { type: Boolean, default: true },
+  lastLocationUpdate: { type: Date, default: Date.now }
+}, { timestamps: true });
+
+export const UserModel = mongoose.models.User || mongoose.model('User', userSchema);
+export const ContactModel = mongoose.models.Contact || mongoose.model('Contact', contactSchema);
+export const TripModel = mongoose.models.Trip || mongoose.model('Trip', tripSchema);
+export const LocationUpdateModel = mongoose.models.LocationUpdate || mongoose.model('LocationUpdate', locationUpdateSchema);
+export const AnomalyEventModel = mongoose.models.AnomalyEvent || mongoose.model('AnomalyEvent', anomalyEventSchema);
+export const SOSEventModel = mongoose.models.SOSEvent || mongoose.model('SOSEvent', sosEventSchema);
+export const IncidentModel = mongoose.models.Incident || mongoose.model('Incident', incidentSchema);
+export const EmergencySessionModel = mongoose.models.EmergencySession || mongoose.model('EmergencySession', emergencySessionSchema);
+
+// Persistent Map syncing in-memory state with MongoDB when connected
+class PersistentMap<T extends Record<string, any>> extends Map<string, T> {
+  private getModel: () => mongoose.Model<any>;
+  private idKey: string;
+
+  constructor(getModel: () => mongoose.Model<any>, idKey: string = '_id') {
+    super();
+    this.getModel = getModel;
+    this.idKey = idKey;
+  }
+
+  set(key: string, value: T): this {
+    super.set(key, value);
+    if (dbStore && dbStore.isConnectedMongo) {
+      try {
+        const model = this.getModel();
+        const filter: any = {};
+        filter[this.idKey] = key;
+        model.updateOne(filter, value, { upsert: true }).catch((err) => {
+          console.warn(`[PERSISTENCE ERROR ${model.modelName}]:`, err.message);
+        });
+      } catch (e: any) {
+        console.warn(`[PERSISTENCE ERROR]:`, e.message);
+      }
+    }
+    return this;
+  }
+
+  delete(key: string): boolean {
+    const res = super.delete(key);
+    if (dbStore && dbStore.isConnectedMongo) {
+      try {
+        const model = this.getModel();
+        const filter: any = {};
+        filter[this.idKey] = key;
+        model.deleteOne(filter).catch((err) => {
+          console.warn(`[DELETE ERROR ${model.modelName}]:`, err.message);
+        });
+      } catch (e: any) {
+        console.warn(`[DELETE ERROR]:`, e.message);
+      }
+    }
+    return res;
+  }
+}
+
+class PersistentLocationArray extends Array<ILocationUpdate> {
+  push(...items: ILocationUpdate[]): number {
+    const res = super.push(...items);
+    if (dbStore && dbStore.isConnectedMongo) {
+      for (const item of items) {
+        LocationUpdateModel.create(item).catch((err: any) => {
+          console.warn('[LOCATION UPDATE PERSIST ERROR]:', err.message);
+        });
+      }
+    }
+    return res;
+  }
+}
+
+// In-Memory Database Store with automatic MongoDB bidirectional persistence
 class MemoryDatabase {
-  users: Map<string, IUser> = new Map();
-  contacts: Map<string, ITrustedContact> = new Map();
-  trips: Map<string, ITrip> = new Map();
-  locationUpdates: ILocationUpdate[] = [];
-  anomalyEvents: Map<string, IAnomalyEvent> = new Map();
-  sosEvents: Map<string, ISOSEvent> = new Map();
-  incidents: Map<string, IIncident> = new Map();
-  emergencySessions: Map<string, IEmergencySession> = new Map();
+  users: Map<string, IUser> = new PersistentMap<IUser>(() => UserModel, '_id');
+  contacts: Map<string, ITrustedContact> = new PersistentMap<ITrustedContact>(() => ContactModel, '_id');
+  trips: Map<string, ITrip> = new PersistentMap<ITrip>(() => TripModel, '_id');
+  locationUpdates: ILocationUpdate[] = new PersistentLocationArray();
+  anomalyEvents: Map<string, IAnomalyEvent> = new PersistentMap<IAnomalyEvent>(() => AnomalyEventModel, '_id');
+  sosEvents: Map<string, ISOSEvent> = new PersistentMap<ISOSEvent>(() => SOSEventModel, '_id');
+  incidents: Map<string, IIncident> = new PersistentMap<IIncident>(() => IncidentModel, '_id');
+  emergencySessions: Map<string, IEmergencySession> = new PersistentMap<IEmergencySession>(() => EmergencySessionModel, 'emergencyId');
   isConnectedMongo: boolean = false;
 
   constructor() {
     this.seedDefaultData();
+  }
+
+  async syncFromMongo() {
+    try {
+      // 1. Sync Users
+      const mongoUsers = await UserModel.find().lean();
+      if (mongoUsers.length === 0) {
+        for (const user of this.users.values()) {
+          await UserModel.updateOne({ _id: user._id }, user, { upsert: true });
+        }
+      } else {
+        for (const u of mongoUsers) {
+          (this.users as Map<string, IUser>).set(String(u._id), u as any);
+        }
+      }
+
+      // 2. Sync Contacts
+      const mongoContacts = await ContactModel.find().lean();
+      if (mongoContacts.length === 0) {
+        for (const c of this.contacts.values()) {
+          await ContactModel.updateOne({ _id: c._id }, c, { upsert: true });
+        }
+      } else {
+        for (const c of mongoContacts) {
+          (this.contacts as Map<string, ITrustedContact>).set(String(c._id), c as any);
+        }
+      }
+
+      // 3. Sync Trips
+      const mongoTrips = await TripModel.find().lean();
+      if (mongoTrips.length === 0) {
+        for (const t of this.trips.values()) {
+          await TripModel.updateOne({ _id: t._id }, t, { upsert: true });
+        }
+      } else {
+        for (const t of mongoTrips) {
+          (this.trips as Map<string, ITrip>).set(String(t._id), t as any);
+        }
+      }
+
+      // 4. Sync Incidents
+      const mongoIncidents = await IncidentModel.find().lean();
+      if (mongoIncidents.length === 0) {
+        for (const inc of this.incidents.values()) {
+          await IncidentModel.updateOne({ _id: inc._id }, inc, { upsert: true });
+        }
+      } else {
+        for (const inc of mongoIncidents) {
+          (this.incidents as Map<string, IIncident>).set(String(inc._id), inc as any);
+        }
+      }
+
+      // 5. Sync Emergencies
+      const mongoEmergencies = await EmergencySessionModel.find().lean();
+      for (const e of mongoEmergencies) {
+        (this.emergencySessions as Map<string, IEmergencySession>).set(String(e.emergencyId), e as any);
+      }
+
+      console.log(`[MONGODB PERSISTENCE ACTIVE] Database synced: ${this.users.size} users, ${this.contacts.size} contacts, ${this.trips.size} trips.`);
+    } catch (err: any) {
+      console.warn('[MONGODB SYNC WARNING]:', err.message);
+    }
   }
 
   private seedDefaultData() {
@@ -326,11 +579,12 @@ export const dbStore = new MemoryDatabase();
 
 export const connectDatabase = async (mongoUri: string): Promise<boolean> => {
   try {
-    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 2000 });
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 3000 });
     dbStore.isConnectedMongo = true;
     console.log('MongoDB connected successfully via Mongoose.');
+    await dbStore.syncFromMongo();
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.log('MongoDB connection skipped/unavailable. Utilizing high-performance built-in memory database store.');
     dbStore.isConnectedMongo = false;
     return false;

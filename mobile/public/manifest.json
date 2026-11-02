@@ -1,0 +1,19 @@
+{
+  "short_name": "SwaRaksha",
+  "name": "SwaRaksha - Women Transport Safety",
+  "description": "Real-Time Public Transport Safety Platform for Women",
+  "icons": [
+    {
+      "src": "./swaraksha-logo.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "display": "standalone",
+  "orientation": "portrait"
+}
+

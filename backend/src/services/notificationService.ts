@@ -27,7 +27,7 @@ export async function sendEmergencyAlertToContacts(
   }
 ) {
   const user = dbStore.users.get(userId);
-  const userName = alertDetails.userName || user?.name || 'A JourneyGuard user';
+  const userName = alertDetails.userName || user?.name || 'A SwaRaksha user';
   const userPhone = user?.phone || 'Unknown';
   const userContacts = Array.from(dbStore.contacts.values()).filter(c => c.userId === userId);
 
@@ -57,7 +57,7 @@ export async function sendLiveLocationShareToContacts(
   emergencyId: string
 ) {
   const user = dbStore.users.get(userId);
-  const userName = user?.name || 'JourneyGuard User';
+  const userName = user?.name || 'SwaRaksha User';
   const userContacts = Array.from(dbStore.contacts.values()).filter(c => c.userId === userId);
 
   const googleMapLink = `https://maps.google.com/?q=${lat},${lng}`;
@@ -108,7 +108,7 @@ export async function sendJourneyEndedSMS(userId: string, userName: string, dest
 
 export async function sendResolvedAlertToContacts(userId: string, emergencyId: string, lat: number, lng: number, durationMins: number, resolvedBy: string) {
   const user = dbStore.users.get(userId);
-  const userName = user?.name || 'JourneyGuard User';
+  const userName = user?.name || 'SwaRaksha User';
   const userContacts = Array.from(dbStore.contacts.values()).filter(c => c.userId === userId);
   const googleMapLink = `https://maps.google.com/?q=${lat},${lng}`;
   const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });

@@ -9,6 +9,10 @@ export interface GeocodedLocation {
 
 // Built-in autocomplete suggestion database for instant search hits
 const PLACE_SUGGESTIONS_DATABASE: GeocodedLocation[] = [
+  { name: 'Shahupuri, Satara', formattedAddress: 'Shahupuri, Satara, Maharashtra, 415002, India', lat: 17.6946, lng: 73.9815 },
+  { name: 'Satara, Maharashtra', formattedAddress: 'Satara, Maharashtra, India', lat: 17.6805, lng: 74.0183 },
+  { name: 'Powai Naka, Satara', formattedAddress: 'Powai Naka, Shahupuri, Satara, Maharashtra', lat: 17.6912, lng: 73.9856 },
+  { name: 'Satara Bus Stand (ST Stand)', formattedAddress: 'Satara Central Bus Station, Satara, Maharashtra', lat: 17.6888, lng: 73.9925 },
   { name: 'Shirdi', formattedAddress: 'Shirdi, Ahmednagar, Maharashtra, India', lat: 19.7667, lng: 74.4764 },
   { name: 'Pune, Maharashtra', formattedAddress: 'Pune, Maharashtra, India', lat: 18.5204, lng: 73.8567 },
   { name: 'Pune Central Station', formattedAddress: 'Pune Railway Station, Agarkar Nagar, Pune', lat: 18.5284, lng: 73.8739 },
@@ -42,7 +46,7 @@ export async function searchPlaceSuggestions(query: string): Promise<GeocodedLoc
   // 2. Query OpenStreetMap Nominatim Live Autocomplete API
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(clean)}&limit=5&addressdetails=1`;
-    const res = await axios.get(url, { headers: { 'User-Agent': 'WomenSafetyApp/1.0' }, timeout: 3500 });
+    const res = await axios.get(url, { timeout: 3500 });
 
     if (res.data && res.data.length > 0) {
       return res.data.map((item: any) => ({

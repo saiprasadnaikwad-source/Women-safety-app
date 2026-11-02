@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getApiBaseUrl } from './apiConfig';
 
 export interface Point {
   lat: number;
@@ -40,7 +41,7 @@ export async function fetchDynamicRoute(origin: Point, destination: Point): Prom
 
   // 1. Query Node Express Backend Routing API endpoint POST /api/routes
   try {
-    const res = await axios.post('http://localhost:5000/api/routes', {
+    const res = await axios.post(`${getApiBaseUrl()}/api/routes`, {
       origin: { latitude: origin.lat, longitude: origin.lng },
       destination: { latitude: destination.lat, longitude: destination.lng }
     }, { timeout: 4000 });

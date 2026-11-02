@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const BACKEND_URL = 'http://localhost:5000';
+import { getApiBaseUrl } from './apiConfig';
 
 export interface EmergencySessionData {
   emergencyId: string;
@@ -55,7 +54,7 @@ export async function getNearbySafeLocations(
   category?: string
 ): Promise<SafeLocationOption[]> {
   try {
-    const res = await axios.get(`${BACKEND_URL}/api/emergency/nearby-safe-locations`, {
+    const res = await axios.get(`${getApiBaseUrl()}/api/emergency/nearby-safe-locations`, {
       params: { lat, lng, radius: 5, category }
     });
     return res.data;
@@ -86,7 +85,7 @@ export async function startEmergencySession(
   userInfo?: { userId: string; userName: string; userPhone: string }
 ): Promise<EmergencySessionData> {
   try {
-    const res = await axios.post(`${BACKEND_URL}/api/emergency/start`, {
+    const res = await axios.post(`${getApiBaseUrl()}/api/emergency/start`, {
       userId: userInfo?.userId,
       userName: userInfo?.userName,
       userPhone: userInfo?.userPhone,
@@ -151,7 +150,7 @@ export async function sendEmergencyLocationUpdate(
   speed?: number
 ): Promise<EmergencySessionData | null> {
   try {
-    const res = await axios.post(`${BACKEND_URL}/api/emergency/location`, {
+    const res = await axios.post(`${getApiBaseUrl()}/api/emergency/location`, {
       emergencyId,
       latitude,
       longitude,
@@ -170,7 +169,7 @@ export async function sendEmergencyLocationUpdate(
  */
 export async function resolveEmergency(emergencyId: string): Promise<boolean> {
   try {
-    await axios.post(`${BACKEND_URL}/api/emergency/resolve`, {
+    await axios.post(`${getApiBaseUrl()}/api/emergency/resolve`, {
       emergencyId,
       resolvedBy: 'User'
     });
