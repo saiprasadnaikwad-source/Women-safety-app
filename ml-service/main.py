@@ -1,9 +1,12 @@
 import os
+import shutil
+import tempfile
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import joblib
+from number_plate import detect_number_plate
 
 app = FastAPI(
     title="Women Safety Transport Anomaly Detection ML API",
@@ -126,6 +129,49 @@ def predict_anomaly(req: PredictionRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+
+@app.post("/detect-plate")
+async def detect_plate(file: UploadFile = File(...)):
+    """
+    Vehicle License Plate Detection & OCR endpoint using FastALPR.
+    Accepts multipart image upload and extracts vehicle registration number.
+    """
+    temp_file = None
+    try:
+        suffix = os.path.splitext(file.filename or "image.jpg")[1] or ".jpg"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as buffer:
+            temp_file = buffer.name
+            shutil.copyfileobj(file.file, buffer)
+
+        plates = detect_number_plate(temp_file)
+
+        if plates and len(plates) > 0:
+            best_plate = plates[0]
+            return {
+                "success": True,
+                "plate_number": best_plate["plate_number"],
+                "confidence": best_plate["confidence"],
+                "bounding_box": best_plate.get("bounding_box"),
+                "plates": plates
+            }
+        else:
+            return {
+                "success": False,
+                "message": "No license plate detected in image.",
+                "plate_number": "",
+                "confidence": 0.0,
+                "bounding_box": None,
+                "plates": []
+            }
+    except Exception as e:
+        print(f"License plate detection error: {e}")
+        raise HTTPException(status_code=500, detail=f"OCR detection error: {str(e)}")
+    finally:
+        if temp_file and os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+            except Exception:
+                pass
 
 if __name__ == "__main__":
     import uvicorn

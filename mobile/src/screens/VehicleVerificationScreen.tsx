@@ -35,9 +35,13 @@ export const VehicleVerificationScreen: React.FC<VehicleVerificationProps> = ({ 
       const formData = new FormData();
       formData.append('image', file);
 
+      const token = localStorage.getItem('token') || '';
+      const headers: Record<string, string> = { 'Content-Type': 'multipart/form-data' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const baseUrl = getApiBaseUrl();
       const res = await axios.post(`${baseUrl}/api/ocr/verify-plate`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers,
         timeout: 20000
       });
 

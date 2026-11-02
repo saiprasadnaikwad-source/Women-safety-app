@@ -11,7 +11,7 @@ export async function detectPlate(req: AuthRequest, res: Response) {
       return res.status(400).json({ message: 'No image file provided.' });
     }
 
-    // Forward image to friend's OCR model as multipart/form-data
+    // Forward image to OCR model as multipart/form-data
     const FormData = (await import('form-data')).default;
     const form = new FormData();
     form.append('file', req.file.buffer, {
@@ -19,18 +19,41 @@ export async function detectPlate(req: AuthRequest, res: Response) {
       contentType: req.file.mimetype
     });
 
-    const ocrRes = await axios.post(`${OCR_MODEL_URL}/detect-plate`, form, {
-      headers: form.getHeaders(),
-      timeout: 15000
-    });
+    let ocrRes;
+    try {
+      ocrRes = await axios.post(`${OCR_MODEL_URL}/detect-plate`, form, {
+        headers: form.getHeaders(),
+        timeout: 15000
+      });
+    } catch (primaryErr: any) {
+      // If port 8001 is offline, try unified mlServiceUrl (e.g. port 8000)
+      if ((primaryErr.code === 'ECONNREFUSED' || primaryErr.code === 'ENOTFOUND') && config.mlServiceUrl && OCR_MODEL_URL !== config.mlServiceUrl) {
+        try {
+          const fallbackForm = new FormData();
+          fallbackForm.append('file', req.file.buffer, {
+            filename: req.file.originalname || 'plate.jpg',
+            contentType: req.file.mimetype
+          });
+          ocrRes = await axios.post(`${config.mlServiceUrl}/detect-plate`, fallbackForm, {
+            headers: fallbackForm.getHeaders(),
+            timeout: 15000
+          });
+        } catch {
+          throw primaryErr;
+        }
+      } else {
+        throw primaryErr;
+      }
+    }
 
-    const { plate_number, confidence, bounding_box } = ocrRes.data;
+    const { plate_number, confidence, bounding_box, plates } = ocrRes.data;
 
     return res.json({
-      success: true,
-      plateNumber: plate_number,
-      confidence: confidence,
-      boundingBox: bounding_box || null,
+      success: ocrRes.data.success ?? Boolean(plate_number),
+      plateNumber: plate_number || (plates && plates[0]?.plate_number) || '',
+      confidence: confidence ?? (plates && plates[0]?.confidence) ?? 0,
+      boundingBox: bounding_box || (plates && plates[0]?.bounding_box) || null,
+      plates: plates || [],
       source: 'ocr_model'
     });
 
