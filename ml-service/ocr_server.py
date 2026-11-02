@@ -74,3 +74,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("OCR_PORT", 8001))
     print(f"Starting FastALPR OCR service on http://0.0.0.0:{port}...")
     uvicorn.run("ocr_server:app", host="0.0.0.0", port=port, reload=False)
+
