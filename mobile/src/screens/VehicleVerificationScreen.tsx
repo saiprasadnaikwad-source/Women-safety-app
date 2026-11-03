@@ -18,6 +18,7 @@ export const VehicleVerificationScreen: React.FC<VehicleVerificationProps> = ({ 
   const [errorMsg, setErrorMsg] = useState('');
   const [manualPlate, setManualPlate] = useState('');
   const [showManual, setShowManual] = useState(false);
+  const [ocrAvailable, setOcrAvailable] = useState(true); // assume available until first failure
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {

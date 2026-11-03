@@ -46,42 +46,84 @@ export const HandsFreeSOSModal: React.FC<HandsFreeProps> = ({ onTriggerSOS, onCl
   }, [listening, onTriggerSOS]);
 
   // Real Hardware Accelerometer Phone Shake Detection
+  // STRICT MODE — same policy as LiveJourneyScreen: only high-intensity shaking triggers.
   useEffect(() => {
+    // Desktop / non-motion devices: never register the listener.
+    const supportsMotion = typeof window !== 'undefined' && 'DeviceMotionEvent' in window;
+    const isTouchDevice = typeof window !== 'undefined' &&
+      ('ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0));
+    if (!supportsMotion || !isTouchDevice) return;
+
     let lastX = 0, lastY = 0, lastZ = 0;
     let lastUpdate = 0;
     let shakeCount = 0;
     let lastShakeTime = 0;
+    let lastTriggerTime = 0;
+    let initialized = false;
+    let consecutiveHits = 0;
 
-    const threshold = Math.max(15, 35 - shakeSensitivity * 2);
+    // Map sensitivity 1–10 to a high threshold 80–59 (higher sensitivity → slightly lower,
+    // but never below 59 — still requires a violent shake).
+    const threshold = Math.max(59, 89 - shakeSensitivity * 3);
+
+    const SHAKE_WINDOW_MS = 1500;
+    const REQUIRED_SHAKES = 4;
+    const REQUIRED_CONSECUTIVE = 2;
+    const COOLDOWN_MS = 8000;
+    const SAMPLE_INTERVAL_MS = 120;
 
     const handleMotion = (event: DeviceMotionEvent) => {
-      const current = event.accelerationIncludingGravity;
-      if (!current || current.x === null || current.y === null || current.z === null) return;
+      // ONLY use gravity-free acceleration. accelerationIncludingGravity jitters even
+      // on a still phone and caused constant false SOS triggers.
+      const accel = event.acceleration;
+      if (!accel || accel.x === null || accel.y === null || accel.z === null) return;
+      const cx: number = accel.x;
+      const cy: number = accel.y;
+      const cz: number = accel.z;
 
       const curTime = Date.now();
-      if ((curTime - lastUpdate) > 100) {
-        const diffTime = curTime - lastUpdate;
+      if (curTime - lastTriggerTime < COOLDOWN_MS) return;
+
+      if ((curTime - lastUpdate) > SAMPLE_INTERVAL_MS) {
         lastUpdate = curTime;
 
-        const delta = Math.abs(current.x + current.y + current.z - lastX - lastY - lastZ) / diffTime * 10000;
-
-        if (delta > threshold) {
-          const now = Date.now();
-          if (now - lastShakeTime < 1200) {
-            shakeCount++;
-            if (shakeCount >= 2) {
-              onTriggerSOS('shake_gesture');
-              shakeCount = 0;
-            }
-          } else {
-            shakeCount = 1;
-          }
-          lastShakeTime = now;
+        if (!initialized) {
+          lastX = cx;
+          lastY = cy;
+          lastZ = cz;
+          initialized = true;
+          return;
         }
 
-        lastX = current.x;
-        lastY = current.y;
-        lastZ = current.z;
+        const dx = cx - lastX;
+        const dy = cy - lastY;
+        const dz = cz - lastZ;
+        const magnitude = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        if (magnitude > threshold) {
+          consecutiveHits++;
+          if (consecutiveHits >= REQUIRED_CONSECUTIVE) {
+            consecutiveHits = 0;
+            const now = Date.now();
+            if (now - lastShakeTime < SHAKE_WINDOW_MS) {
+              shakeCount++;
+              if (shakeCount >= REQUIRED_SHAKES) {
+                onTriggerSOS('shake_gesture');
+                shakeCount = 0;
+                lastTriggerTime = now;
+              }
+            } else {
+              shakeCount = 1;
+            }
+            lastShakeTime = now;
+          }
+        } else {
+          consecutiveHits = 0;
+        }
+
+        lastX = cx;
+        lastY = cy;
+        lastZ = cz;
       }
     };
 

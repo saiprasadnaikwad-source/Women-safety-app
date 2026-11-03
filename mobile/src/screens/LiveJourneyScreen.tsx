@@ -160,8 +160,11 @@ export const LiveJourneyScreen: React.FC<LiveJourneyProps> = ({
           setVoiceHeardPhrase(transcript);
         }
 
-        const keywords = ['help me', 'help', 'emergency', 'save me', 'bachao', 'please help', 'police'];
-        const matched = keywords.some(kw => transcript.includes(kw));
+        // Whole-word phrases only — prevents "helping", "self-help", TV/mic echo noise from
+        // firing SOS. Bare "help"/"police" removed: far too common in background audio.
+        const phrases = ['help me', 'save me', 'please help', 'emergency help', 'bachao', 'bacha o'];
+        const normalized = ` ${transcript.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()} `;
+        const matched = phrases.some(kw => normalized.includes(` ${kw} `));
 
         if (matched) {
           console.log(`[VOICE SOS TRIGGERED] Emergency keyword matched: "${transcript}"`);
@@ -212,42 +215,91 @@ export const LiveJourneyScreen: React.FC<LiveJourneyProps> = ({
   }, [isEmergencyActive]);
 
   // Physical Phone Shake Gesture Detection (Accelerometer) during journey
+  // STRICT MODE — only deliberate, high-intensity shaking triggers SOS.
+  // Ignored entirely on desktop, and ignores the noisy accelerationIncludingGravity
+  // fallback (which false-fires on jitter). Requires multiple consecutive hard spikes.
   useEffect(() => {
+    if (isEmergencyActive) return; // Don't register listener at all during emergency
+
+    // Desktop / non-motion devices: never register the listener.
+    // Phones expose the accelerometer event; laptops generally do not.
+    const supportsMotion = typeof window !== 'undefined' && 'DeviceMotionEvent' in window;
+    const isTouchDevice = typeof window !== 'undefined' &&
+      ('ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0));
+    if (!supportsMotion || !isTouchDevice) return;
+
     let lastX = 0, lastY = 0, lastZ = 0;
     let lastUpdate = 0;
     let shakeCount = 0;
     let lastShakeTime = 0;
+    let lastTriggerTime = 0;
+    let initialized = false;
+    let consecutiveHits = 0;
+
+    const SHAKE_THRESHOLD = 80;          // Much higher — only violent shakes register
+    const REQUIRED_CONSECUTIVE = 2;      // 2 back-to-back samples must exceed threshold
+    const SHAKE_WINDOW_MS = 1500;        // All shakes must land inside 1.5s
+    const REQUIRED_SHAKES = 4;           // 4 distinct hard shakes needed
+    const COOLDOWN_MS = 8000;            // 8s cooldown after a trigger
+    const SAMPLE_INTERVAL_MS = 120;
 
     const handleMotion = (event: DeviceMotionEvent) => {
-      if (isEmergencyActive) return;
-      const current = event.accelerationIncludingGravity;
-      if (!current || current.x === null || current.y === null || current.z === null) return;
+      // ONLY use gravity-free acceleration. accelerationIncludingGravity jitters even
+      // on a still phone and caused constant false SOS triggers.
+      const accel = event.acceleration;
+      if (!accel || accel.x === null || accel.y === null || accel.z === null) return;
+      const cx: number = accel.x;
+      const cy: number = accel.y;
+      const cz: number = accel.z;
 
       const curTime = Date.now();
-      if ((curTime - lastUpdate) > 100) {
-        const diffTime = curTime - lastUpdate;
+
+      // Cooldown guard — ignore all motion for 8 seconds after a trigger
+      if (curTime - lastTriggerTime < COOLDOWN_MS) return;
+
+      if ((curTime - lastUpdate) > SAMPLE_INTERVAL_MS) {
         lastUpdate = curTime;
 
-        const delta = Math.abs(current.x + current.y + current.z - lastX - lastY - lastZ) / diffTime * 10000;
-
-        if (delta > 25) { // Vigorous shake threshold
-          const now = Date.now();
-          if (now - lastShakeTime < 1200) {
-            shakeCount++;
-            if (shakeCount >= 2) {
-              console.log('[SHAKE GESTURE DETECTED] Triggering emergency mode');
-              triggerEmergencyMode('MANUAL_SOS');
-              shakeCount = 0;
-            }
-          } else {
-            shakeCount = 1;
-          }
-          lastShakeTime = now;
+        if (!initialized) {
+          // First reading: just store baseline, don't compute delta
+          lastX = cx;
+          lastY = cy;
+          lastZ = cz;
+          initialized = true;
+          return;
         }
 
-        lastX = current.x;
-        lastY = current.y;
-        lastZ = current.z;
+        const dx = cx - lastX;
+        const dy = cy - lastY;
+        const dz = cz - lastZ;
+        const magnitude = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        if (magnitude > SHAKE_THRESHOLD) {
+          consecutiveHits++;
+          // Require repeated hard spikes — a single bump/noise spike cannot count.
+          if (consecutiveHits >= REQUIRED_CONSECUTIVE) {
+            consecutiveHits = 0;
+            const now = Date.now();
+            if (now - lastShakeTime < SHAKE_WINDOW_MS) {
+              shakeCount++;
+              if (shakeCount >= REQUIRED_SHAKES) {
+                console.log('[SHAKE GESTURE DETECTED] High-intensity shake sequence → triggering emergency mode');
+                triggerEmergencyMode('MANUAL_SOS');
+                shakeCount = 0;
+                lastTriggerTime = now; // Start cooldown
+              }
+            } else {
+              shakeCount = 1;
+            }
+            lastShakeTime = now;
+          }
+        } else {
+          consecutiveHits = 0;
+        }
+
+        lastX = cx;
+        lastY = cy;
+        lastZ = cz;
       }
     };
 
@@ -260,6 +312,7 @@ export const LiveJourneyScreen: React.FC<LiveJourneyProps> = ({
         window.removeEventListener('devicemotion', handleMotion);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEmergencyActive]);
 
   // Helper: Change Safe Location Category Priority (Police, Hospital, Fire Station)
@@ -614,9 +667,10 @@ export const LiveJourneyScreen: React.FC<LiveJourneyProps> = ({
         triggerEmergencyMode('ANOMALY_DETECTION');
       }
     } catch (e) {
+      // Telemetry failure is NOT evidence of danger. Never auto-trigger SOS here —
+      // just show a non-blocking safety prompt so the user decides.
       if (offsetMeters > 500 && !isEmergencyActive) {
-        setRiskScore(75);
-        setRiskLevel('HIGH');
+        console.warn('[TELEMETRY] Backend/ML unavailable — prompt only, NOT triggering SOS.');
         setShowSafetyPrompt(true);
       }
     }
